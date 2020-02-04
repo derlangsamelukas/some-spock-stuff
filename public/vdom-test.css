@@ -2,6 +2,65 @@ body
 {
     margin: 0;
     background-color: #333344;
-    color: white;
+    color: #47687F;
     font-family: Arial;
+}
+
+#app
+{
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.header
+{
+    background-color: #00000044;
+    width: 100%;
+    height: 50px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.body
+{
+    
+}
+
+.body .list
+{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.body .list .item
+{
+    box-sizing: border-box;
+    padding: 10px;
+}
+
+.body button
+{
+    border-radius: none;
+    border: none;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    cursor: pointer;
+    background-color: #00000022;
+    color: #47687F;
+}
+
+.body button:hover
+{
+    
+}
+
+button::-moz-focus-inner
+{
+    border: none;
 }

@@ -1,21 +1,37 @@
 
+(define (header model)
+  `(div
+    (class "header")
+    (children
+     (div
+      (class "item")
+      (text "Hejoo")))))
+
+(define (body model)
+  `(div
+    (class "body")
+    (children
+     (div
+      (class "list")
+      (children . ,(map (lambda (item) `(div (class "item") (text ,item) (on (click remove ,item)))) model)))
+     (button (text "click") (on (click add))))))
+
+(define (render model)
+  `(div
+    (children
+     ,(header model)
+     ,(body model))))
+
 (define run
   (lambda ()
-    (define render
-      (lambda (model)
-        (let ((on
-               (match model
-                 ("naaaa" '((on (click naa "nu"))))
-                 ("nu" '((on (click naa "ni"))))
-                 (x '()))))
-          `(div ,@on (text ,model)))))
     (define handle
       (lambda (model event data dispatch)
         (match event
-          ('naa data)
+          ('add `(,@model ,((native (jref "prompt" (js-window))) (jstring "Name: "))))
+          ('remove (remove-if (cut equal? data <>) model))
           (_ model))))
     (let ((root (query-selector window.document "#app")))
-      (vdom-create root "naaaa" render handle)
+      (vdom-create root '() render handle)
       (display "ok\n"))))
 
 (set! .onload (callback run))

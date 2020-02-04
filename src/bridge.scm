@@ -160,3 +160,7 @@
 (define js-method
   (lambda (method object)
     (lambda args (apply (native-method (jref (jstring method) object)) (cons object args)))))
+
+(define js-window
+  (lambda ()
+    (%host-ref window)))

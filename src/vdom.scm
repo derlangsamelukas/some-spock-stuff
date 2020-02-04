@@ -1,26 +1,3 @@
-(define set-handlers
-  (lambda (node dispatch)
-    (let ((dataset (%property-ref dataset node)))
-      (let ((imonit
-             (lambda (name)
-               (print (jref name dataset))
-               (unless (void? (jref name dataset))
-                 (let ((data (if (void? (jref (string-append name "data"))) #f (jref (string-append name "data")))))
-                   (dispatch (string->symbol (jref name dataset)) data))))))
-        ;; (imonit "click")
-        ;; (imonit "input")
-        #f
-        )
-      ;; (on node "click" (lambda ()
-      ;;                    (unless (void? (jref "click" dataset))
-      ;;                      (let ((data (if (void? (%property-ref clickdata dataset)) #f (string->expr (%property-ref clickdata dataset)))))
-      ;;                        (dispatch (string->symbol (%property-ref click dataset)) data)))))
-      ;; (on node "input" (lambda ()
-      ;;                    (unless (void? (%property-ref input dataset))
-      ;;                      (dispatch (string->symbol (%property-ref input dataset)) (%property-ref value node)))))
-      )
-    ;; (on node "input" (lambda (e) (print (%property-ref target e))))
-    ))
 
 (define diff
   (lambda (new old cc)
@@ -60,7 +37,10 @@
          (map
           (lambda (pair)
             (let ((event (symbol->string (car pair)))
-                  (handler (callback (lambda () (dispatch (cadr pair) (caddr pair))))))
+                  (handler
+                   (callback
+                    (lambda ()
+                      (dispatch (cadr pair) (car (if (null? (cddr pair)) '(#f) (cddr pair))))))))
               (on* node event handler)
               (jset! event ons handler)))
           add))))))
@@ -68,9 +48,8 @@
 (define create-node-from-attrs
   (lambda (attrs dispatch)
     (let ((node (create-node (symbol->string (car attrs)))))
-      (set-handlers node dispatch)
-      (check-attrs node '() (cdr attrs) dispatch)
       (jset! "on" node (%))
+      (check-attrs node '() (cdr attrs) dispatch)
       node)))
 
 (define assoc-list
@@ -101,26 +80,26 @@
                                      (remove-if (lambda (attr) (equal? (caar new-attrs) (car attr))) attr-to-remove)))))))
           (map-attrs new-attrs old-attrs)
           (map-on-handlers node on-new on-old dispatch)
-          ;; (map (lambda (on)
-          ;;        ((native (%property-ref set (%host-ref Reflect)))
-          ;;         (%property-ref dataset node)
-          ;;         (jstring (symbol->string (car on)))
-          ;;         (jstring (symbol->string (cadr on))))
-          ;;        ((native (%property-ref set (%host-ref Reflect)))
-          ;;         (%property-ref dataset node)
-          ;;         (jstring (string-append (symbol->string (car on)) "data"))
-          ;;         (jstring (expr->string (if (not (null? (cddr on))) (caddr on) #f)))))
-          ;;      on-new)
           ;; check children
           (if (>= (length children-new) (length children-old))
-              (begin (map (lambda (old new index) (map-tree (vector-ref (%property-ref children node) index) node old new)) children-old children-new (range 0 (length children-old)))
-                     (map (lambda (attr) (append-child node (create-node-from-attrs attr dispatch))) (nth-cdr (length children-old) children-new)))
-              (begin (map (lambda (new old index) (map-tree (vector-ref (%property-ref children node) index) node new old)) children-new children-old (range 0 (length children-new)))
-                     (map (lambda () (remove-node (vector-ref (%property-ref children node) 0)))
-                          (range 0 (- (length children-old) (length children-new))))))
+              (begin (map (lambda (old new index)
+                            (map-tree (vector-ref (%property-ref children node) index) node old new dispatch))
+                          children-old children-new (range 0 (length children-old)))
+                     (map (lambda (attr)
+                            (append-child node (create-node-from-attrs attr dispatch)))
+                          (nth-cdr (length children-old) children-new)))
+              (begin ;; (print children-new)
+                     ;; (print children-old)
+                     (map (lambda (new old index)
+                            (map-tree (vector-ref (jref "children" node) index) node old new dispatch))
+                          children-new children-old (range 0 (length children-new)))
+                     (map (lambda (index)
+                            (remove-node (vector-ref (jref "children" node) index)))
+                          ;; (range 0 (- (length children-old) (length children-new)))
+                          (range (length children-new) (length children-old)))))
           ;; check textContent
           (unless (equal? text-old text-new)
-            (%property-set! textContent node (jstring (if (equal? text-new '()) "" (car text-new))))))))))
+            (jset! "textContent" node (jstring (if (equal? text-new '()) "" (car text-new))))))))))
 
 (define map-tree
   (lambda (node parent old new dispatch)

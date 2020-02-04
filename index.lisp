@@ -9,4 +9,4 @@
   (div (@ (id "app")) "")
   (script (@ (src "spock-runtime.js") (type "text/javascript")) "")
   ;; (script (@ (type "text/javascript")) (bundle "match" "js" "run"))
-  (script (@ (type "text/javascript")) (bundle "bridge" "vdom" "run-vdom"))))
+  (script (@ (type "text/javascript")) (bundle "match" "bridge" "vdom" "run-vdom"))))

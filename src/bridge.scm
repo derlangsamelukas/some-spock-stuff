@@ -88,9 +88,17 @@
       (%property-set! className div "title")
       div)))
 
+(define on*
+  (lambda (node name native-fn)
+    ((native-method (%property-ref addEventListener node)) node (jstring name) native-fn)))
+
 (define on
   (lambda (node name fn)
-    ((native-method (%property-ref addEventListener node)) node (jstring name) (callback fn))))
+    (on* node name (callback fn))))
+
+(define off
+  (lambda (node name native-fn)
+    ((native-method (%property-ref removeEventListener node)) node (jstring name) native-fn)))
 
 (define parent
   (lambda (node)

@@ -6,7 +6,12 @@ body
     font-family: Arial;
 }
 
-#screen
+/* #screen */
+/* { */
+/*     background-color: #000000; */
+/* } */
+
+canvas
 {
-    background-color: #000000;
+    display: block;
 }

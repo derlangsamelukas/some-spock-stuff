@@ -11,6 +11,7 @@
   `(div
     (class "body")
     (children
+     ;; (img (src "images/ship.png"))
      (div
       (class "list")
       (children . ,(map (lambda (item) `(div (class "item") (text ,item) (on (click remove ,item)))) model)))

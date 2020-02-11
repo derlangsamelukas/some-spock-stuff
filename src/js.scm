@@ -3,7 +3,10 @@
   ((native console.log) x))
 
 (define (js:select selector)
-  ((native-method document.querySelector) window.document selector))
+  ((native-method document.querySelector) window.document (jstring selector)))
+
+(define (js:select-all selector)
+  ((native-method document.querySelectorAll) window.document (jstring selector)))
 
 (define (js:add-listener node event fn)
   ((native-method document.addEventListener) node (jstring event) (callback fn)))
@@ -50,3 +53,12 @@
 
 (define (js:keyboard:key event)
   (%property-ref key event))
+
+(define (js:ref name object)
+  ((native Reflect.get) object (jstring name)))
+
+(define (js:set! name object value)
+  ((native Reflect.set) object (jstring name) value))
+
+(define (js:method name object . args)
+  (apply (native-method (js:ref name object)) (cons object args)))

@@ -1,217 +1,107 @@
+(define (plain a b)
+  (list
+   (* -0.707 a)
+   (* 1 b)
+   (* 0.707 a)))
 
-(define (-width sprite)
-  (car sprite))
 
-(define (-height sprite)
-  (cadr sprite))
+(define (x-z-plain a b)
+  (list
+   a
+   0
+   b))
 
-(define (render context x y sprite)
-  (let ((width (-width sprite))
-        (height (-height sprite)))
-    (js:context:stroke-rect context (- x (/ width 2)) (- y (/ height 2)) width height)))
+(define (control-camera keys-down camera ship)
+  (with-down
+   keys-down
+   `(;; (w ,(lambda () (3d:rot:x:set! camera (+ 0.1 (-x (3d:rot:ref camera))))))
+     ;; (a ,(lambda () (3d:rot:y:set! camera (+ 0.1 (-y (3d:rot:ref camera))))))
+     ;; (s ,(lambda () (3d:rot:x:set! camera (+ -0.1 (-x (3d:rot:ref camera))))))
+     ;; (d ,(lambda () (3d:rot:y:set! camera (+ -0.1 (-y (3d:rot:ref camera))))))
+     ;; (v ,(lambda () (print (3d:rot:ref camera))))
+     (a ,(lambda () (3d:rot:y:set! ship (+ 0.1 (-y (3d:rot:ref ship))))))
+     (d ,(lambda () (3d:rot:y:set! ship (+ -0.1 (-y (3d:rot:ref ship))))))
 
-(define (next-frame model fn)
-  (js:window:request-animation-frame (lambda () (fn model))))
+     ;; (ArrowUp ,(lambda ()
+     ;;             (rotate! ship
+     ;;                      (math:+
+     ;;                       (math:* 0.1 (list
+     ;;                                    (cos (-x (3d:rot:ref ship)))
+     ;;                                    0
+     ;;                                    (sin (-z (3d:rot:ref ship)))))
+     ;;                       (3d:rot:ref ship)))))
+     
+     (w ,(lambda ()
+           (let ((angle (-y (3d:rot:ref ship)))
+                 (y-angle #f))
+             (move! ship
+                    (math:+
+                     (math:* 0.1 (x-z-plain (sin angle)
+                                            (cos angle)))
+                     (3d:position:ref ship)))
+             (camera-look-at! camera (3d:position:ref ship))))))))
 
-(define (push-end x lst)
-  (if (null? lst)
-      (list x)
-      (cons (car lst) (push-end x (cdr lst)))))
+(define (main-loop camera moon ship)
+  (lambda (angle events keys-down cc)
+    ;; (3d:rot:y:set! test (+ 0.1 (-y (3d:rot:ref test))))
+    (control-camera keys-down camera ship)
+    (let ((length (math:length (3d:position:ref moon))))
+      (move! moon
+             (math:+
+              (3d:position:ref ship)
+              (plain (* 2 (cos angle))
+                     (* 2 (sin angle))))))
+    (cc (+ 0.04 angle))))
 
-(define (recursive fn . args)
-  (define (loop . args)
-    (apply fn loop args))
-  (apply loop args))
-
-(define (foldl f z lst)
-  (recursive
-   (lambda (cc z lst)
-     (if (null? lst)
-         z
-         (cc (f z (car lst)) (cdr lst))))
-   z
-   lst))
-
-(define (add-to-list x lst)
-  (recursive
-   (lambda (cc lst)
-     (if (null? lst)
-         (list x)
-         (if (equal? x (car lst))
-             lst
-             (cons (car lst) (cc (cdr lst))))))
-   lst))
-
-(define (remove-from-list x lst)
-  (recursive
-   (lambda (cc lst)
-     (if (null? lst)
-         '()
-         (if (equal? x (car lst))
-             (cdr lst)
-             (cons (car lst) (remove-from-list x (cdr lst))))))
-   lst))
-
-(define (main-frame model idle)
-  (let ((event-queue '())
-        (keys-down '()))
-    (define (cc model)
-      (js:window:request-animation-frame
-       (lambda ()
-         (let ((model (idle model event-queue keys-down cc)))
-           (set! event-queue '())
-           model))))
-    (js:add-listener
-     (js:window)
-     "keydown"
-     (lambda (event)
-       (set! event-queue (push-end event event-queue))
-       (set! keys-down (add-to-list (js:keyboard:key event) keys-down))
-       ))
-    (js:add-listener
-     (js:window)
-     "keyup"
-     (lambda (event)
-       (set! event-queue (push-end event event-queue))
-       (set! keys-down (remove-from-list (js:keyboard:key event) keys-down))
-       ))
-    (idle model event-queue keys-down cc)))
-
-(define (handle-events model event)
-  ;; (cond
-  ;;  ((equal? "a" (js:keyboard:key event)) (- model 5))
-  ;;  (else model))
-  model)
-
-(define (exists? x lst)
-  (recursive
-   (lambda (cc lst)
-     (if (null? lst)
-         #f
-         (if (equal? x (car lst))
-             #t
-             (cc (cdr lst)))))
-   lst))
-
-;; (define (run)
-;;   (let* ((screen (js:select "#screen"))
-;;          (context (js:canvas:get-context screen "2d"))
-;;          (width (js:canvas:width screen))
-;;          (height (js:canvas:height screen)))
-;;     (define (mainloop model events keys-down cc)
-;;       (let ((model (foldl handle-events model events)))
-;;         (let ((model (cond
-;;                       ((exists? "a" keys-down)
-;;                        (- model 5))
-;;                       ((exists? "d" keys-down)
-;;                        (+ model 5))
-;;                       (else model))))
-;;           (js:context:fill-style context "#000000")
-;;           (js:context:stroke-style context "#FFFFFF")
-;;           (js:context:clear context)
-;;           ;; (js:context:stroke-rect context 0 0 100 100)
-;;           (render context model 400 '(30 50))
-;;           (cc model))))
-;;     (main-frame 250 mainloop)))
-
-;; (print
-;;  (match '(a b c)
-;;    ((x . _) x)
-;;    (y 'numb)))
-
-(define (3d:line color from to)
-  (let* ((material (new THREE.LineBasicMaterial (% "color" color)))
-         (points
-          (vector
-           (new THREE.Vector3 (car from) (cadr from) (caddr from))
-           (new THREE.Vector3 (car to) (cadr to) (caddr to))))
-         (geometry (js:method "setFromPoints" (new THREE.BufferGeometry) points)))
-    (new THREE.Line geometry material)))
-
-(define (3d:position:ref object)
-  (let ((pos (js:ref "position" object)))
-    (list
-     (js:ref "x" pos)
-     (js:ref "y" pos)
-     (js:ref "z" pos))))
-
-(define (3d:position:set! object x y z)
-  (js:method "set" (js:ref "position" object) x y z))
-
-(define (js:incr! object path by)
-  (define (loop object path)
-    (if (null? (cdr path))
-        (js:set! (car path) object (+ (js:ref (car path) object) by))
-        (loop (js:ref (car path) object) (cdr path))))
-  (loop object path))
-
-(define (pow x exp)
-  (define (loop exp)
-    (if (<= exp 0)
-        1
-        (* x (loop (- exp 1)))))
-  (loop exp))
+(define (make-ship)
+  (let ((top (make-plane 1 1))
+        (bottom (make-plane 1 1))
+        (left (make-plane 1 1))
+        (right (make-plane 1 1))
+        (front (make-plane 1 1 (make-material-basic #xFF0000)))
+        (back (make-plane 1 1)))
+    (move-y! top 0.5)
+    (rotate-x! top (- (/ Math.PI 2)))
+    (move-y! bottom -0.5)
+    (rotate-x! bottom (/ Math.PI 2))
+    (move-x! left 0.5)
+    (rotate-y! left (/ Math.PI 2))
+    (move-x! right -0.5)
+    (rotate-y! right (- (/ Math.PI 2)))
+    (move-z! front 0.5)
+    (move-z! back -0.5)
+    (rotate-x! back Math.PI)
+    (make-group (list top bottom left right front back))))
 
 (define (run)
-  (let* ((canvas (js:select "#screen"))
-         (context (js:method "getContext" canvas (jstring "webgl2") (% "alpha" #f))))
-    (let ((scene (new THREE.Scene))
-          (camera (new THREE.PerspectiveCamera 75 1 0.1 1000))
-          (renderer (new THREE.WebGLRenderer (% "canvas" canvas "context" context)))
-          (geometry (new THREE.BoxGeometry))
-          ;; (geometry (new THREE.DodecahedronGeometry 1 2))
-          ;; (material (new THREE.MeshBasicMaterial (% "color" #x00ff00)))
-          (material (new THREE.MeshStandardMaterial (%)))
-          (light (new THREE.PointLight #x0f0f0)))
-      (let ((cube (new THREE.Mesh geometry material))
-            (x-axis (3d:line #xFF0000 '(-100 0 0) '(100 0 0)))
-            (y-axis (3d:line #x00FF00 '(0 -100 0) '(0 100 0)))
-            (z-axis (3d:line #x0000FF '(0 0 -100) '(0 0 100))))
-        ;; (js:method "setSize" renderer 500 500)
-        ;; (js:method "appendChild" (js:select "#app") (js:ref "domElement" renderer))
-        (js:method "add" scene light)
-        (js:method "add" scene x-axis)
-        (js:method "add" scene y-axis)
-        (js:method "add" scene z-axis)
-        (js:method "add" scene cube)
-        (3d:position:set! light 50 50 50)
-        (3d:position:set! camera 2 2 2)
-        (js:method "lookAt" camera 0 0 0)
-        ;; (js:method "set" (js:ref "position" light) 50 50 50)
-        ;; (js:set! "z" (js:ref "position" camera) 5)
-        (main-frame
-         0
-         (lambda (model events keys-down cc)
-           (let ((plain (lambda (a b)
-                          (match (3d:position:ref camera)
-                            ((x y z)
-                             (let ((deg (acos
-                                         (/ (+ (* x x) (* y y) (* z 0))
-                                            (* (sqrt (+ (pow x 2) (pow y 2) (pow z 2)))
-                                               (sqrt (+ (pow x 2) (pow y 2) 0)))))))
-                               (list
-                                (* 0.3 a)
-                                (* 0.3 b)
-                                (* 0.3 a))))))))
-             ;; (js:set! "x" (js:ref "rotation" cube) (+ 0.01 (js:ref "x" (js:ref "rotation" cube))))
-             ;; (js:set! "y" (js:ref "rotation" cube) (+ 0.01 (js:ref "y" (js:ref "rotation" cube))))
-             ;; (js:set! "y" (js:ref "rotation" cube) (+ 0.01 (js:ref "z" (js:ref "rotation" cube))))
-             (cond
-              ((exists? "x" keys-down)
-               ;; (js:incr! camera '("position" "x") 0.02)
-               (set! model (+ 0.01 model))
-               (apply 3d:position:set! camera (plain (* 10 (cos model)) (* 10 (sin model))))
-               ;; (js:set! "x" (js:ref "position" camera) (* 2 (cos model)))
-               ;; (js:set! "y" (js:ref "position" camera) (* 2 (sin model)))
-               (js:method "lookAt" camera 0 0 0))
-              ((exists? "y" keys-down)
-               (js:incr! camera '("position" "y") -0.02)
-               (js:method "lookAt" camera 0 0 0))
-              ((exists? "z" keys-down)
-               (js:incr! camera '("position" "z") 0.02)
-               (js:method "lookAt" camera 0 0 0))))
-           (js:method "render" renderer scene camera)
-           (cc model)))))))
+  (let ((scene (make-scene-with-axis))
+        (renderer (make-renderer (js:select "#screen")))
+        (camera (at '(3 3 3)
+                    make-camera 1))
+        (light (at '(50 50 50)
+                   make-point-light #xFFFFFF 1))
+        (light2 (at '(-50 50 -50)
+                    make-point-light #xFFFFFF 0.5))
+        (cube (at '(0 0 0)
+                  make-cube 1))
+        (moon (at '(0 2 0)
+                  make-sphere 0.1 2))
+        (test (at '(0 0 0)
+                  make-plane 10 10))
+        (ship (make-ship)))
+    (scene-add-all scene (list moon light light2 ship))
+    (3d:rot:x:set! test (- (/ Math.PI 2)))
+    (js:set! "cam" (js:window) camera)
+    (camera-look-at! camera '(0 0 0))
+    (let ((loop (main-loop camera moon ship)))
+      (main-frame (/ Math.PI 2)
+                  (lambda (x y z cc)
+                    (loop x
+                          y
+                          z
+                          (lambda (x)
+                            (renderer-render! renderer scene camera)
+                            (cc x))))))))
 
 (js:add-listener
  (js:window)

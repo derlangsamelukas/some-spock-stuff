@@ -10,6 +10,6 @@
   (div (@ (id "app")) "")
   (script (@ (src "spock-runtime.js") (type "text/javascript")) "")
   (script (@ (src "three.min.js") (type "text/javascript")) "")
-  (script (@ (type "text/javascript")) (bundle "match" "js" "run"))
+  (script (@ (type "text/javascript")) (bundle "match" "js" "main-loop" "run"))
   ;; (script (@ (type "text/javascript")) (bundle "match" "bridge" "vdom" "run-vdom"))
   ))

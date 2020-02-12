@@ -102,6 +102,31 @@
 (define (make-material-standard)
   (new THREE.MeshStandardMaterial))
 
+(define (make-quaternion angle v)
+  (let ((quaternion (new THREE.Quaternion)))
+    (js:method "setFromAxisAngle" quaternion (new THREE.Vector3 (-x v) (-y v) (-z v)) angle)
+    quaternion))
+
+(define (q->s a ijk)
+  (let* ((angle (acos a))
+         (sina (sin angle)))
+    (if (zero? sina)
+        (list (* angle 2) 0 0 0)
+        (cons (* angle 2)
+              (map (cut / <> sina)
+                   ijk)))))
+
+(define (s->q angle v)
+  (let ((angle (/ angle 2)))
+    (cons
+     (cos angle)
+     (map (cut * (sin angle) <>)
+          v))))
+
+;; (js:log (make-quaternion (/ Math.PI 2) '(0 0 1)))
+;; (let ((x (s->q (/ Math.PI 2) '(0 0 1))))
+;;   (print (q->s (car x) (cdr x))))
+
 (define (3d:line color from to material)
   (let* ((material (if (void? material) (new THREE.LineBasicMaterial (% "color" color)) material))
          (points
@@ -124,7 +149,6 @@
 (define (move-x! object x) (js:set! "x" (js:ref "position" object) x))
 (define (move-y! object y) (js:set! "y" (js:ref "position" object) y))
 (define (move-z! object z) (js:set! "z" (js:ref "position" object) z))
-
 
 (define (3d:rot:set! object x y z)
   (js:method "set" (js:ref "rotation" object) x y z))

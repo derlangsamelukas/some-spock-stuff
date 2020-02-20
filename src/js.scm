@@ -62,3 +62,6 @@
 
 (define (js:method name object . args)
   (apply (native-method (js:ref name object)) (cons object args)))
+
+(define (string-split splitter string)
+  (js:method "split" (new window.String (jstring string)) (jstring splitter)))

@@ -4,13 +4,6 @@
    (* 1 b)
    (* 0.707 a)))
 
-
-(define (x-z-plain a b)
-  (list
-   a
-   0
-   b))
-
 (define (rotate-by e angle)
   (let ((m (- 1 (cos angle)))
         (cosa (cos angle))
@@ -32,12 +25,6 @@
           (* (+ (* e3 e2 m) (* e1 sina)) (-y v))
           (* (+ (* e3 e3 m)        cosa) (-z v)))))))
 
-(define (rotate v rotation)
-  (let ((tx (rotate-by '(1 0 0) (-x rotation)))
-        (ty (rotate-by '(0 1 0) (-y rotation)))
-        (tz (rotate-by '(0 0 1) (-z rotation))))
-    ((o tz ty tx) v)))
-
 (define (angle-between v1 v2)
   (acos
    (/ (+ (* (-x v1) (-x v2))
@@ -54,57 +41,53 @@
 
 ;; (print (rotation-of-vector '(0 0 1)))
 
+(define (apply-rotation rotate-me ship)
+  (let* ((rot (3d:rot:ref ship))
+         (first (rotate-by '(1 0 0) (-x rot)))
+         (second (rotate-by (first '(0 1 0)) (-y rot)))
+         (third (rotate-by (second (first '(0 0 1))) (-z rot))))
+    (third (second (first rotate-me)))))
+
+(define (camera-adjust-third-persion camera ship)
+  (let ((rot (3d:rot:ref ship))
+        (angle (+ 0.2 Math.PI)))
+    (move!
+     camera
+     (math:+ (apply-rotation ((rotate-by '(1 0 0) angle) '(0 0 3)) ship)
+             (3d:position:ref ship)))
+    (rotate! camera rot)
+    (js:method "rotateX" camera angle)
+    (js:method "rotateZ" camera Math.PI))
+  ;; (camera-look-at! camera (3d:position:ref ship))
+  )
+
 (define (control-camera keys-down camera ship)
-  (with-down
-   keys-down
-   `(;; (w ,(lambda () (3d:rot:x:set! camera (+ 0.1 (-x (3d:rot:ref camera))))))
-     ;; (a ,(lambda () (3d:rot:y:set! camera (+ 0.1 (-y (3d:rot:ref camera))))))
-     ;; (s ,(lambda () (3d:rot:x:set! camera (+ -0.1 (-x (3d:rot:ref camera))))))
-     ;; (d ,(lambda () (3d:rot:y:set! camera (+ -0.1 (-y (3d:rot:ref camera))))))
-     ;; (v ,(lambda () (print (3d:rot:ref camera))))
-     (a ,(lambda () (3d:rot:y:set! ship (+ 0.1 (-y (3d:rot:ref ship))))))
-     ;; (d ,(lambda () (3d:rot:y:set! ship (+ -0.1 (-y (3d:rot:ref ship))))))
-     (b ,(lambda () (print (3d:rot:ref ship))))
-
-     (ArrowUp ,(lambda ()
-                 ;; (rotate! ship
-                 ;;          (math:+
-                 ;;           (rotation-of-vector
-                 ;;            ((rotate-by (rotate '(0 0 1) (3d:rot:ref ship)) (/ Math.PI 2)) '(0 0 1)))
-                 ;;           '(0 0 0)))
-                 (3d:rot:x:set! ship (+ 0.1 (-x (3d:rot:ref ship))))
-                 ;; (rotate! ship
-                 ;;          (math:+
-                 ;;           '(-0.1 0 0)
-                 ;;           (3d:rot:ref ship)))
-                 ))
-
-     ;; (r ,(lambda () (rotate! ship '(0 0 0))))
-     ;; (x ,(lambda () (js:method "rotateX" ship 0.1)))
-     ;; (y ,(lambda () (js:method "rotateY" ship 0.1)))
-     ;; (z ,(lambda () (js:method "rotateZ" ship 0.1)))
-     ;; (x ,(lambda () (rotate-x! ship (+ 0.1 (-x (3d:rot:ref ship))))))
-     ;; (y ,(lambda () (rotate-y! ship (+ 0.1 (-y (3d:rot:ref ship))))))
-     ;; (z ,(lambda () (rotate-z! ship (+ 0.1 (-z (3d:rot:ref ship))))))
-
-     ;; (x ,(lambda ()
-     ;;       (let* ((q (js:ref "quaternion" ship))
-     ;;              (q* (q->s (js:ref "w" q)
-     ;;                        (list (js:ref "x" q)
-     ;;                              (js:ref "y" q)
-     ;;                              (js:ref "z" q)))))
-     ;;         (js:method "setRotationFromQuaternion" (make-quaternion (angle-between ))))))
-     
-     (w ,(lambda ()
-           (move! ship (math:+
-                        (rotate '(0 0 0.1) (3d:rot:ref ship))
-                        (3d:position:ref ship)))
-           (camera-look-at! camera (3d:position:ref ship)))))))
+  (let ((camera-adjust-third-persion
+         ;; camera-adjust-third-persion
+         void
+         ))
+    (with-down
+     keys-down
+     `(;; (x ,(lambda () (js:method "rotateX" ship 0.1)))
+       ;; (a ,(lambda () (js:set! "x" (js:ref "rotation" ship) (+ 0.1 (-x (3d:rot:ref ship))))))
+       (a ,(lambda () (js:method "rotateY" ship 0.1) (camera-adjust-third-persion camera ship)))
+       (d ,(lambda () (js:method "rotateY" ship -0.1) (camera-adjust-third-persion camera ship)))
+       (w ,(lambda () (js:method "rotateX" ship -0.1) (camera-adjust-third-persion camera ship)))
+       (s ,(lambda () (js:method "rotateX" ship 0.1) (camera-adjust-third-persion camera ship)))
+       (| |
+        ,(lambda ()
+           (move!
+            ship
+            (math:+ (math:* 0.1 (apply-rotation '(0 0 1) ship))
+                    (3d:position:ref ship)))
+           (camera-adjust-third-persion camera ship)))
+       ))))
 
 (define (main-loop camera moon ship)
   (lambda (angle events keys-down cc)
     ;; (3d:rot:y:set! test (+ 0.1 (-y (3d:rot:ref test))))
     (control-camera keys-down camera ship)
+    ;; (camera-look-at! camera ship)
     (let ((length (math:length (3d:position:ref moon))))
       (move! moon
              (math:+
@@ -134,37 +117,60 @@
     (make-group (list top bottom left right front back))))
 
 (define (run)
-  (let ((scene (make-scene-with-axis))
-        (renderer (make-renderer (js:select "#screen")))
-        (camera (at '(3 3 3)
-                    make-camera 1))
-        (light (at '(50 50 50)
-                   make-point-light #xFFFFFF 1))
-        (light2 (at '(-50 50 -50)
-                    make-point-light #xFFFFFF 0.5))
-        (cube (at '(0 0 0)
-                  make-cube 1))
-        (moon (at '(0 2 0)
-                  make-sphere 0.1 2))
-        (test (at '(0 0 0)
-                  make-plane 10 10))
-        (ship (make-ship)))
-    (scene-add-all scene (list moon light light2 ship))
-    (3d:rot:x:set! test (- (/ Math.PI 2)))
-    (js:set! "ship" (js:window) ship)
-    (js:set! "cam" (js:window) camera)
-    (camera-look-at! camera '(0 0 0))
-    (let ((loop (main-loop camera moon ship)))
-      (main-frame (/ Math.PI 2)
-                  (lambda (x y z cc)
-                    (loop x
-                          y
-                          z
-                          (lambda (x)
-                            (renderer-render! renderer scene camera)
-                            (cc x))))))))
+  (let ((screen (js:select "#screen")))
+    (js:set! "width" screen (js:ref "innerHeight" (js:window)))
+    (js:set! "height" screen (js:ref "innerHeight" (js:window)))
+    (let ((scene (make-scene-with-axis))
+          (renderer (make-renderer screen))
+          (camera (at '(3 3 3)
+                      make-camera 1))
+          (light (at '(50 50 50)
+                     make-point-light #xFFFFFF 1))
+          (light2 (at '(-50 50 -50)
+                      make-point-light #xFFFFFF 0.5))
+          (cube (at '(0 0 0)
+                    make-cube 1))
+          (moon (at '(0 2 0)
+                    make-sphere 0.1 2))
+          (test (at '(0 0 0)
+                    make-plane 10 10))
+          ;; (box (make-ship))
+          ;; (ship (make-ship))
+          )
+      (scene-add-all scene (list moon light light2))
+      (loadit
+       (lambda (ship)
+         (scene-add scene ship)
+         (3d:rot:x:set! test (- (/ Math.PI 2)))
+         (js:set! "ship" (js:window) ship)
+         (js:set! "cam" (js:window) camera)
+         ;; (camera-look-at! camera '(0 0 0))
+         (camera-adjust-third-persion camera ship)
+         (let ((loop (main-loop camera moon ship)))
+           (main-frame (/ Math.PI 2)
+                       (lambda (x y z cc)
+                         (loop x
+                               y
+                               z
+                               (lambda (x)
+                                 (renderer-render! renderer scene camera)
+                                 (cc x)))))))))))
 
 (js:add-listener
  (js:window)
  "load"
  run)
+
+(define (loadit cc)
+  (js:method
+   "then"
+   (js:method
+    "then"
+    (js:method "fetch" (js:window) "monkey.obj")
+    (callback
+     (lambda (result)
+       (js:method "text" result))))
+   (callback
+    (lambda (obj-data)
+      (cc (obj-data->mesh obj-data))))))
+

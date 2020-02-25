@@ -18,11 +18,17 @@
     (lambda () (spock file))))
 
 (define (bundle-spock-files files)
+  (with-output-to-file "tmp.scm"
+    (lambda ()
+      (let* ((file (open-input-file "transform.scm"))
+             (thunk (read file)))
+        (close-input-port file)
+        (write ((eval thunk))))))
   (with-output-to-string
     (lambda ()
       (apply
        spock
-       (map find-file files)))))
+       (cons "tmp.scm" (map find-file files))))))
 
 (define (render-index-page)
   (let* ((file (open-input-file "index.lisp"))

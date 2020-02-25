@@ -4,97 +4,76 @@
    (* 1 b)
    (* 0.707 a)))
 
-(define (rotate-by e angle)
-  (let ((m (- 1 (cos angle)))
-        (cosa (cos angle))
-        (sina (sin angle))
-        (e1 (-x e))
-        (e2 (-y e))
-        (e3 (-z e)))
-    (lambda (v)
-      (list
-       (+ (* (+ (* e1 e1 m)        cosa) (-x v))
-          (* (- (* e1 e2 m) (* e3 sina)) (-y v))
-          (* (+ (* e1 e3 m) (* e2 sina)) (-z v)))
-       
-       (+ (* (+ (* e2 e1 m) (* e3 sina)) (-x v))
-          (* (+ (* e2 e2 m)        cosa) (-y v))
-          (* (- (* e2 e3 m) (* e1 sina)) (-z v)))
-       
-       (+ (* (- (* e3 e1 m) (* e2 sina)) (-x v))
-          (* (+ (* e3 e2 m) (* e1 sina)) (-y v))
-          (* (+ (* e3 e3 m)        cosa) (-z v)))))))
 
-(define (angle-between v1 v2)
-  (acos
-   (/ (+ (* (-x v1) (-x v2))
-         (* (-y v1) (-y v2))
-         (* (-z v1) (-z v2)))
-      (* (math:length v1)
-         (math:length v2)))))
-
-(define (rotation-of-vector v)
-  (list
-   (angle-between v '(1 0 0))
-   (angle-between v '(0 1 0))
-   (angle-between v '(0 0 1))))
 
 ;; (print (rotation-of-vector '(0 0 1)))
 
-(define (apply-rotation rotate-me ship)
-  (let* ((rot (3d:rot:ref ship))
-         (first (rotate-by '(1 0 0) (-x rot)))
-         (second (rotate-by (first '(0 1 0)) (-y rot)))
-         (third (rotate-by (second (first '(0 0 1))) (-z rot))))
-    (third (second (first rotate-me)))))
-
-(define (camera-adjust-third-persion camera ship)
+(define (camera-adjust-third-persion camera ship game-state)
   (let ((rot (3d:rot:ref ship))
-        (angle (+ 0.2 Math.PI)))
-    (move!
-     camera
-     (math:+ (apply-rotation ((rotate-by '(1 0 0) angle) '(0 0 3)) ship)
-             (3d:position:ref ship)))
-    (rotate! camera rot)
-    (js:method "rotateX" camera angle)
-    (js:method "rotateZ" camera Math.PI))
+        ;; (camera-pos (apply-rotation '(0 0 -3) camera))
+        (angle (+ 0.5 Math.PI)))
+    (when (game-state-lock-camera game-state)
+      (move!
+       camera
+       (math:+ (apply-rotation ((make-rotation-matrix '(1 0 0) angle) '(0 0 3)) ship)
+               (3d:position:ref ship)))
+      (rotate! camera rot)
+      (js:method "rotateX" camera angle)
+      (js:method "rotateZ" camera Math.PI)))
   ;; (camera-look-at! camera (3d:position:ref ship))
   )
 
-(define (control-camera keys-down camera ship)
-  (let ((camera-adjust-third-persion
-         ;; camera-adjust-third-persion
-         void
+(define (control-camera keys-down camera ship shield game-state)
+  (let ((speed 0.05)
+        (camera-adjust-third-persion
+         camera-adjust-third-persion
+         ;; void
          ))
     (with-down
      keys-down
      `(;; (x ,(lambda () (js:method "rotateX" ship 0.1)))
        ;; (a ,(lambda () (js:set! "x" (js:ref "rotation" ship) (+ 0.1 (-x (3d:rot:ref ship))))))
-       (a ,(lambda () (js:method "rotateY" ship 0.1) (camera-adjust-third-persion camera ship)))
-       (d ,(lambda () (js:method "rotateY" ship -0.1) (camera-adjust-third-persion camera ship)))
-       (w ,(lambda () (js:method "rotateX" ship -0.1) (camera-adjust-third-persion camera ship)))
-       (s ,(lambda () (js:method "rotateX" ship 0.1) (camera-adjust-third-persion camera ship)))
+       (a ,(lambda () (js:method "rotateZ" ship (- speed)) (camera-adjust-third-persion camera ship game-state)))
+       (d ,(lambda () (js:method "rotateZ" ship speed) (camera-adjust-third-persion camera ship game-state)))
+       (s ,(lambda () (js:method "rotateX" ship (- speed)) (camera-adjust-third-persion camera ship game-state)))
+       (w ,(lambda () (js:method "rotateX" ship speed) (camera-adjust-third-persion camera ship game-state)))
+       (x ,(lambda () (game-state-player-velocity! game-state (math:* 0.95 (game-state-player-velocity game-state)))))
        (| |
         ,(lambda ()
-           (move!
-            ship
-            (math:+ (math:* 0.1 (apply-rotation '(0 0 1) ship))
-                    (3d:position:ref ship)))
-           (camera-adjust-third-persion camera ship)))
-       ))))
+           (game-state-player-velocity! game-state
+             (math:+ (math:* 0.0005 (apply-rotation '(0 0 1) ship))
+                     (game-state-player-velocity game-state)))
+           ;; (move!
+           ;;  ship
+           ;;  (math:+ (math:* 0.1 (apply-rotation '(0 0 1) ship))
+           ;;          (3d:position:ref ship)))
+           ;; (camera-adjust-third-persion camera ship)
+           ))))))
 
-(define (main-loop camera moon ship)
-  (lambda (angle events keys-down cc)
+(define (main-loop camera moon ship shield)
+  (lambda (game-state events keys-down cc)
     ;; (3d:rot:y:set! test (+ 0.1 (-y (3d:rot:ref test))))
-    (control-camera keys-down camera ship)
+    (control-camera keys-down camera ship shield game-state)
     ;; (camera-look-at! camera ship)
     (let ((length (math:length (3d:position:ref moon))))
       (move! moon
              (math:+
               (3d:position:ref ship)
-              (plain (* 2 (cos angle))
-                     (* 2 (sin angle))))))
-    (cc (+ 0.04 angle))))
+              (plain (* 2 (cos (game-state-moon-angle game-state)))
+                     (* 2 (sin (game-state-moon-angle game-state))))))
+      (move! ship (math:+ (game-state-player-velocity game-state)
+                          (3d:position:ref ship)))
+      (move! shield (3d:position:ref ship))
+      (rotate! shield (3d:rot:ref ship))
+      (camera-adjust-third-persion camera ship game-state))
+    (game-state-moon-angle! game-state (+ 0.04 (game-state-moon-angle game-state)))
+    (cc game-state)))
+
+(define (light-up-at positions)
+  (map
+   (lambda (pos)
+     (at pos make-point-light #xFFFFFF 0.3))
+   positions))
 
 (define (make-ship)
   (let ((top (make-plane 1 1 (make-material-basic #x00FF00)))
@@ -124,30 +103,49 @@
           (renderer (make-renderer screen))
           (camera (at '(3 3 3)
                       make-camera 1))
-          (light (at '(50 50 50)
-                     make-point-light #xFFFFFF 1))
-          (light2 (at '(-50 50 -50)
-                      make-point-light #xFFFFFF 0.5))
+          (lights (light-up-at '((50 50 50)
+                                 (-50 50 -50)
+                                 (0 50 0)
+                                 (-50 220 120)
+                                 (100 -100 -280))))
           (cube (at '(0 0 0)
                     make-cube 1))
           (moon (at '(0 2 0)
-                    make-sphere 0.1 2))
-          (test (at '(0 0 0)
-                    make-plane 10 10))
+                    make-sphere 0.1 2 (new THREE.MeshStandardMaterial (% "shading" THREE.FlatShading "color" #x0088FF))))
+          (test (at '(0 -2 0)
+                    make-plane 10 10 (new THREE.MeshStandardMaterial (% "side" THREE.DoubleSide))))
+          (mars (at '(0 0 100)
+                    make-sphere 10 1 (new THREE.MeshStandardMaterial (% "shading" THREE.FlatShading "color" #xFF0000))))
+          (merkur (at '(-50 200 100)
+                      make-sphere 7 1 (new THREE.MeshStandardMaterial (% "shading" THREE.FlatShading "color" #xFF8800))))
+          (neptun (at '(50 -50 -200)
+                      make-sphere 20 1 (new THREE.MeshStandardMaterial (% "shading" THREE.FlatShading "color" #x00FF00))))
+          (shield (at '(0 0 0)
+                      make-sphere 1.2 2 (new THREE.MeshStandardMaterial (% "shading" THREE.FlatShading "color" #x0000FF "opacity" 0 "transparent" #t))))
           ;; (box (make-ship))
           ;; (ship (make-ship))
-          )
-      (scene-add-all scene (list moon light light2))
+          (game-state (make-game-state)))
+      (scene-add-all scene (append (list moon test mars merkur neptun shield)
+                                   lights))
+      (js:add-listener
+       (js:window)
+       "keyup"
+       (lambda (e)
+         (when (equal? "t" (js:ref "key" e))
+           (game-state-lock-camera! game-state (not (game-state-lock-camera game-state))))
+         (when (equal? "o" (js:ref "key" e))
+           (js:set! "opacity" (js:ref "material" shield) (if (= 0 (js:ref "opacity" (js:ref "material" shield))) 0.1 0)))))
       (loadit
        (lambda (ship)
+         (mouse-listener ship)
          (scene-add scene ship)
          (3d:rot:x:set! test (- (/ Math.PI 2)))
          (js:set! "ship" (js:window) ship)
          (js:set! "cam" (js:window) camera)
          ;; (camera-look-at! camera '(0 0 0))
-         (camera-adjust-third-persion camera ship)
-         (let ((loop (main-loop camera moon ship)))
-           (main-frame (/ Math.PI 2)
+         (camera-adjust-third-persion camera ship game-state)
+         (let ((loop (main-loop camera moon ship shield)))
+           (main-frame game-state
                        (lambda (x y z cc)
                          (loop x
                                y
@@ -163,14 +161,55 @@
 
 (define (loadit cc)
   (js:method
-   "then"
+   "catch"
    (js:method
     "then"
-    (js:method "fetch" (js:window) "monkey.obj")
+    (js:method
+     "then"
+     (js:method "fetch" (js:window) "spaceship.obj")
+     (callback
+      (lambda (result)
+        (js:method "text" result))))
     (callback
-     (lambda (result)
-       (js:method "text" result))))
-   (callback
-    (lambda (obj-data)
-      (cc (obj-data->mesh obj-data))))))
+     (lambda (obj-data)
+       (cc (obj-data->mesh obj-data)))))
+   (callback (lambda (x) ((native window.alert) x)))))
 
+(define (mouse-listener ship)
+  (let ((start #f))
+    (js:add-listener
+     (js:window)
+     "mousedown"
+     (lambda (event)
+       (set! start
+         (list (js:ref "clientX" event)
+               (js:ref "clientY" event)))))
+    (js:add-listener (js:window) "mouseup" (lambda () (set! start #f)))
+    (js:add-listener
+     (js:window)
+     "mousemove"
+     (lambda (event)
+       (when start
+         (let ((l (list (js:ref "clientX" event)
+                        (js:ref "clientY" event))))
+           (js:method "rotateOnAxis"
+                      ship
+                      (new THREE.Vector3 1 0 0)
+                      (* -0.01 (- (-y start)
+                                      (-y l))))
+           (js:method "rotateOnAxis"
+                      ship
+                      (new THREE.Vector3 0 1 0)
+                      (* 0.01 (- (-x start)
+                                  (-x l))))
+           (set! start l)))))
+    (js:add-listener
+     (js:window)
+     "deviceready"
+     (lambda ()
+       (js:method "getCurrentAcceleration"
+                  navigator.accelerometer
+                  (callback
+                   (lambda (e)
+                     (js:method "alert" (js:window) (js:ref "x" e))))
+                  (callback (lambda () (js:method "alert" (js:window) "error"))))))))
